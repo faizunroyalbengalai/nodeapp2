@@ -218,12 +218,17 @@
           exit 1
         fi
         pm2 save
-        pm2 startup systemd -u ubuntu --hp /home/ubuntu
       args:
         executable: /bin/bash
         chdir: "{{ app_dir }}"
       become: yes
       become_user: ubuntu
+
+    - name: Configure PM2 startup
+      shell: pm2 startup systemd -u ubuntu --hp /home/ubuntu
+      args:
+        executable: /bin/bash
+      become: yes
 
     - name: Configure nginx reverse proxy
       copy:
