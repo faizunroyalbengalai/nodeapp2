@@ -189,6 +189,8 @@
           {% if node_env_db_password | default('') != '' %}
           DB_PASSWORD={{ node_env_db_password }}
           {% endif %}
+          PORT=3000
+          HOST=0.0.0.0
 
     - name: Install npm dependencies
       npm:
@@ -223,6 +225,9 @@
         chdir: "{{ app_dir }}"
       become: yes
       become_user: ubuntu
+      environment:
+        PORT: "3000"
+        HOST: "0.0.0.0"
 
     - name: Configure PM2 startup
       shell: pm2 startup systemd -u ubuntu --hp /home/ubuntu
@@ -274,6 +279,45 @@
       become_user: ubuntu
       when: app_wait is failed
       ignore_errors: yes
+
+    - name: Print PM2 status if app did not start
+      shell: pm2 status
+      become: yes
+      become_user: ubuntu
+      when: app_wait is failed
+      ignore_errors: yes
+
+    - name: Print .env file if app did not start
+      shell: cat {{ app_dir }}/.env || true
+      when: app_wait is failed
+      ignore_errors: yes
+
+    - name: Print node version
+      shell: node --version && npm --version
+      when: app_wait is failed
+      ignore_errors: yes
+
+    - name: Try starting app manually to capture error
+      shell: |
+        cd {{ app_dir }}
+        set -a
+        [ -f .env ] && . .env
+        set +a
+        export PORT=3000
+        export HOST=0.0.0.0
+        timeout 10 node server.js 2>&1 || true
+      args:
+        executable: /bin/bash
+      become: yes
+      become_user: ubuntu
+      when: app_wait is failed
+      ignore_errors: yes
+      register: manual_start
+
+    - name: Show manual start output
+      debug:
+        var: manual_start.stdout_lines
+      when: app_wait is failed and manual_start is defined
 
     - name: Fail if app did not start
       fail:
